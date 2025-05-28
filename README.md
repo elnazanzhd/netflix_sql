@@ -1,4 +1,4 @@
-به من
+
 
 # 📊 Netflix Data Analysis with SQL
 
