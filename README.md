@@ -1,90 +1,96 @@
+# Netflix Data Analysis with SQL
 
+![Netflix Logo](https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg)
 
-# 📊 Netflix Data Analysis with SQL
+## 📌 Project Overview
+This SQL analysis explores Netflix's content catalog to uncover insights about content distribution, production trends, and creative collaborations. The project uses PostgreSQL to analyze a dataset of Netflix movies and TV shows.
 
-<p align="center">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg" alt="Netflix Logo" width="320"  />
-</p>
-## 📊 Dataset
-**Source:** [Netflix Movies and TV Shows on Kaggle](https://www.kaggle.com/datasets/shivamb/netflix-shows/versions/5?resource=download)  
+**Dataset Source**: [Netflix Movies and TV Shows on Kaggle](https://www.kaggle.com/datasets/shivamb/netflix-shows)  
+**Last Updated**: June 2023  
+**Tools Used**: PostgreSQL, pgAdmin  
 
-## 📁 Project Overview
-
-This project demonstrates SQL-based analysis of a Netflix dataset using PostgreSQL. The SQL queries are crafted to answer real-world business questions and uncover hidden patterns in content type, release trends, viewer preferences, and creative collaborations.
-
-All queries are stored in a single SQL file:
-
-```bash
-solutions.sql
+##  Database Schema
+```sql
+CREATE TABLE netflix(
+  show_id     VARCHAR(10) PRIMARY KEY,
+  kind        VARCHAR(10) NOT NULL CHECK (kind IN ('Movie', 'TV Show')),
+  title       VARCHAR(150) NOT NULL,
+  director    VARCHAR(220),
+  performers  TEXT,
+  country     VARCHAR(150),
+  date_added  DATE,  
+  release_year INT CHECK
 ```
+## Content Distribution
+```sql
+-- Content type breakdown
+SELECT 
+  kind,
+  COUNT(*) AS count,
+  ROUND(100.0*COUNT(*)/SUM(COUNT(*)) OVER(), 1) AS percentage
+FROM netflix
+GROUP BY kind;
+```
+## Production Trends
+```sql
+-- Top 10 production countries
+WITH country_exploded AS (
+  SELECT TRIM(UNNEST(STRING_TO_ARRAY(country, ','))) AS country
+  FROM netflix
+  WHERE country IS NOT NULL
+)
+SELECT 
+  country,
+  COUNT(*) AS production_count,
+  RANK() OVER (ORDER BY COUNT(*) DESC) AS rank
+FROM country_exploded
+GROUP BY country
+ORDER BY production_count DESC
+LIMIT 10;
+```
+## Content Duration Analysis
+```sql
+-- Longest movies
+SELECT 
+  title,
+  CAST(SUBSTRING(duration FROM '(\d+) min') AS INT) AS minutes
+FROM netflix
+WHERE kind = 'Movie'
+ORDER BY minutes DESC
+LIMIT 5;
 
----
+-- TV shows with most seasons
+SELECT 
+  title,
+  CAST(SUBSTRING(duration FROM '(\d+) Season') AS INT) AS seasons
+FROM netflix
+WHERE kind = 'TV Show'
+ORDER BY seasons DESC
+LIMIT 5;
+```
+## Top Actors & Collaborations
+```sql
+-- Top 10 US Movie Actors
+WITH us_movies AS (
+  SELECT UNNEST(STRING_TO_ARRAY(performers,',')) AS actor
+  FROM netflix 
+  WHERE country LIKE '%United States%' AND kind='Movie'
+)
+SELECT TRIM(actor) AS actor_name, COUNT(*) AS appearances
+FROM us_movies GROUP BY actor_name ORDER BY appearances DESC LIMIT 10;
 
-## 🧱 Table Schema
-
-The dataset is stored in one table: `netflix`. Below is the schema used:
-
-| Column | Data Type | Description |
-|---------------|---------------|----------------------------------------|
-| `show_id` | `VARCHAR(10)` | Unique ID for each show |
-| `kind` | `VARCHAR(10)` | Type of content: 'Movie' or 'TV Show' |
-| `title` | `VARCHAR(150)`| Title of the content |
-| `director` | `VARCHAR(220)`| Director(s) of the content |
-| `performers` | `VARCHAR(1000)`| List of cast members |
-| `country` | `VARCHAR(150)`| Country where the content was produced |
-| `date_added` | `VARCHAR(50)` | Date added to Netflix |
-| `release_year`| `INT` | Year the content was released |
-| `rating` | `VARCHAR(12)` | Maturity rating |
-| `duration` | `VARCHAR(20)` | Length of the content (minutes/seasons)|
-| `listed_in` | `VARCHAR(100)`| Genres/categories |
-| `description` | `VARCHAR(255)`| Short summary |
-
----
-
-## Business Questions Addressed
-
-### 1.Content Overview
-- How many titles are in the dataset?
-- How many unique release years are there?
-- What are the types of content available?
-
-### 2.Top Countries
-- Top 10 countries producing the most Netflix content
-
-### 3. Duration Analysis
-- What are the longest movies and TV shows on the platform?
-- Which TV shows have more than 6 seasons?
-
-### 4. Genre and Actor Trends
-- Which genres are most common?
-- Who are the top 10 actors in U.S.-produced movies?
-
-### 5. Rating Insights
-- What is the most common rating per content type?
-
-### 6. Director-Actor Collaborations
-- Which director-actor pairs have worked together the most?
-
----
-
-## 🛠️ Key SQL Techniques Used
-
-- **Aggregate Functions**: `COUNT()`, `GROUP BY`
-- **Window Functions**: `RANK() OVER (PARTITION BY ...)`
-- **CTEs (Common Table Expressions)**: For modular, readable subqueries
-- **String Functions**: `SUBSTRING`, `STRING_TO_ARRAY`, `TRIM`, `UNNEST`
-- **Filtering**: `WHERE`, `LIKE`, `IS NOT NULL`, Regex-based conditions
-- **Sorting & Limiting**: `ORDER BY`, `LIMIT`
-
-
-
-## How to Run
+-- Frequent Director-Actor Pairs
+SELECT director, TRIM(actor) AS actor, COUNT(*) AS collaborations
+FROM (
+  SELECT director, UNNEST(STRING_TO_ARRAY(performers,',')) AS actor
+  FROM netflix WHERE director IS NOT NULL
+) t GROUP BY director, actor HAVING COUNT(*) > 1 ORDER BY collaborations DESC;
+Data Validation: CHECK constraints on schema
+```
+##  How to Run
 
 1. Load your dataset into a PostgreSQL-compatible database.
 2. Create the `netflix` table using the schema provided.
 3. Run the queries from `solutions.sql`.
 4. Analyze or visualize the results using your preferred BI tool or SQL client.
-
-
----
 
